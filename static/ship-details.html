@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ship Details - Maritime Operations</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .status-active { background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%); }
+        .status-loading { background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); }
+        .status-discharge { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); }
+        .status-complete { background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%); }
+        .status-paused { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
+        
+        .progress-ring {
+            transform: rotate(-90deg);
+        }
+        
+        .progress-ring-circle {
+            transition: stroke-dasharray 0.35s;
+            transform-origin: 50% 50%;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-lg border-b-4 border-blue-600">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-6">
+                <div class="flex items-center">
+                    <button onclick="goBack()" class="mr-4 p-2 rounded-lg hover:bg-gray-100 transition duration-200">
+                        <i class="fas fa-arrow-left text-xl text-gray-600"></i>
+                    </button>
+                    <i class="fas fa-ship text-4xl text-blue-600 mr-4"></i>
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-900">Ship Operation Details</h1>
+                        <p id="shipSubtitle" class="text-gray-600">Loading ship information...</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button onclick="goToMaster()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition duration-200">
+                        <i class="fas fa-tachometer-alt mr-2"></i>Dashboard
+                    </button>
+                    <button onclick="editShip()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition duration-200">
+                        <i class="fas fa-edit mr-2"></i>Edit
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Loading State -->
+    <div id="loadingState" class="flex justify-center items-center py-20">
+        <div class="text-center">
+            <i class="fas fa-spinner fa-spin text-4xl text-blue-600 mb-4"></i>
+            <p class="text-gray-600">Loading ship details...</p>
+        </div>
+    </div>
+
+    <!-- Error State -->
+    <div id="errorState" class="hidden max-w-4xl mx-auto px-4 py-20">
+        <div class="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
+            <i class="fas fa-exclamation-triangle text-4xl text-red-600 mb-4"></i>
+            <h2 class="text-xl font-bold text-red-800 mb-2">Ship Not Found</h2>
+            <p class="text-red-600 mb-4">The requested ship operation could not be found.</p>
+            <button onclick="goToMaster()" class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg font-semibold transition duration-200">
+                Return to Dashboard
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main id="mainContent" class="hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Ship Status Overview -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+            <!-- Ship Info Card -->
+            <div class="lg:col-span-2 bg-white rounded-xl shadow-lg p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-2xl font-bold text-gray-900">Vessel Information</h2>
+                    <div id="statusBadge" class="px-4 py-2 rounded-full text-white font-semibold">
+                        <i class="fas fa-circle mr-2"></i>
+                        <span id="statusText">Loading</span>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Basic Information</h3>
+                        <div class="space-y-3">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Vessel Name:</span>
+                                <span id="vesselName" class="font-semibold">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Vessel Type:</span>
+                                <span id="vesselType" class="font-semibold">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Port:</span>
+                                <span id="port" class="font-semibold">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Berth:</span>
+                                <span id="berth" class="font-semibold">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Company:</span>
+                                <span id="company" class="font-semibold">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Operation Type:</span>
+                                <span id="operationType" class="font-semibold">-</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Operation Details</h3>
+                        <div class="space-y-3">
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Operation Date:</span>
+                                <span id="operationDate" class="font-semibold">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Shift Start:</span>
+                                <span id="shiftStart" class="font-semibold">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Shift End:</span>
+                                <span id="shiftEnd" class="font-semibold">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Total Vehicles:</span>
+                                <span id="totalVehicles" class="font-semibold">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Automobiles:</span>
+                                <span id="totalAutomobiles" class="font-semibold">-</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-600">Heavy Equipment:</span>
+                                <span id="heavyEquipment" class="font-semibold">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Progress Card -->
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6">Operation Progress</h2>
+                <div class="flex justify-center mb-6">
+                    <div class="relative w-32 h-32">
+                        <svg class="progress-ring w-32 h-32" viewBox="0 0 120 120">
+                            <circle class="progress-ring-circle stroke-gray-200" stroke-width="8" fill="transparent" r="52" cx="60" cy="60"/>
+                            <circle id="progressCircle" class="progress-ring-circle stroke-blue-600" stroke-width="8" fill="transparent" r="52" cx="60" cy="60" stroke-dasharray="0 327" stroke-linecap="round"/>
+                        </svg>
+                        <div class="absolute inset-0 flex items-center justify-center">
+                            <span id="progressText" class="text-2xl font-bold text-gray-900">0%</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-gray-600">Current Progress:</span>
+                        <span id="progressValue" class="font-semibold">0%</span>
+                    </div>
+                    
+                    <div class="space-y-2">
+                        <label class="block text-sm font-medium text-gray-700">Update Progress:</label>
+                        <div class="flex space-x-2">
+                            <input type="range" id="progressSlider" min="0" max="100" value="0" class="flex-1">
+                            <button onclick="updateProgress()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition duration-200">
+                                Update
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Team Information -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <!-- Auto Operations Team -->
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6">Auto Operations Team</h2>
+                <div class="space-y-4">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Team Lead:</span>
+                        <span id="autoOpsLead" class="font-semibold">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Assistant:</span>
+                        <span id="autoOpsAssistant" class="font-semibold">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Total Drivers:</span>
+                        <span id="totalDrivers" class="font-semibold">-</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Heavy Operations Team -->
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <h2 class="text-2xl font-bold text-gray-900 mb-6">Heavy Operations Team</h2>
+                <div class="space-y-4">
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Team Lead:</span>
+                        <span id="heavyOpsLead" class="font-semibold">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Assistant:</span>
+                        <span id="heavyOpsAssistant" class="font-semibold">-</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-600">Operation Manager:</span>
+                        <span id="operationManager" class="font-semibold">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Targets and Performance -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6">Targets & Performance</h2>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-blue-600" id="brvTarget">-</div>
+                    <div class="text-gray-600">BRV Target</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-green-600" id="zeeTarget">-</div>
+                    <div class="text-gray-600">ZEE Target</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-purple-600" id="souTarget">-</div>
+                    <div class="text-gray-600">SOU Target</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl font-bold text-orange-600" id="expectedRate">-</div>
+                    <div class="text-gray-600">Expected Rate</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Update Actions -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6">Quick Actions</h2>
+            <div class="flex flex-wrap gap-4">
+                <button onclick="updateStatus('active')" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition duration-200">
+                    <i class="fas fa-play mr-2"></i>Set Active
+                </button>
+                <button onclick="updateStatus('loading')" class="bg-yellow-600 hover:bg-yellow-700 text-white px-6 py-3 rounded-lg font-semibold transition duration-200">
+                    <i class="fas fa-upload mr-2"></i>Set Loading
+                </button>
+                <button onclick="updateStatus('discharge')" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition duration-200">
+                    <i class="fas fa-download mr-2"></i>Set Discharge
+                </button>
+                <button onclick="updateStatus('paused')" class="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold transition duration-200">
+                    <i class="fas fa-pause mr-2"></i>Pause Operation
+                </button>
+                <button onclick="updateStatus('complete')" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg font-semibold transition duration-200">
+                    <i class="fas fa-check mr-2"></i>Mark Complete
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let currentShip = null;
+        let shipId = null;
+
+        // Get ship ID from URL parameters
+        function getShipIdFromUrl() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('id');
+        }
+
+        // Load ship details
+        async function loadShipDetails() {
+            shipId = getShipIdFromUrl();
+            
+            if (!shipId) {
+                showError();
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/ships/${shipId}`);
+                
+                if (!response.ok) {
+                    throw new Error('Ship not found');
+                }
+
+                currentShip = await response.json();
+                displayShipDetails(currentShip);
+                hideLoading();
+                
+            } catch (error) {
+                console.error('Error loading ship details:', error);
+                showError();
+            }
+        }
+
+        // Display ship details
+        function displayShipDetails(ship) {
+            // Update header
+            document.getElementById('shipSubtitle').textContent = `${ship.vesselName} - ${ship.vesselType}`;
+            
+            // Update status badge
+            const statusBadge = document.getElementById('statusBadge');
+            const statusText = document.getElementById('statusText');
+            statusBadge.className = `px-4 py-2 rounded-full text-white font-semibold status-${ship.status}`;
+            statusText.textContent = ship.status.charAt(0).toUpperCase() + ship.status.slice(1);
+
+            // Update basic information
+            document.getElementById('vesselName').textContent = ship.vesselName || '-';
+            document.getElementById('vesselType').textContent = ship.vesselType || '-';
+            document.getElementById('port').textContent = ship.port || '-';
+            document.getElementById('berth').textContent = ship.berth || '-';
+            document.getElementById('company').textContent = ship.company || '-';
+            document.getElementById('operationType').textContent = ship.operationType || '-';
+
+            // Update operation details
+            document.getElementById('operationDate').textContent = ship.operationDate || '-';
+            document.getElementById('shiftStart').textContent = ship.shiftStart || '-';
+            document.getElementById('shiftEnd').textContent = ship.shiftEnd || '-';
+            document.getElementById('totalVehicles').textContent = ship.totalVehicles || '0';
+            document.getElementById('totalAutomobiles').textContent = ship.totalAutomobilesDischarge || '0';
+            document.getElementById('heavyEquipment').textContent = ship.heavyEquipmentDischarge || '0';
+
+            // Update team information
+            document.getElementById('autoOpsLead').textContent = ship.autoOpsLead || '-';
+            document.getElementById('autoOpsAssistant').textContent = ship.autoOpsAssistant || '-';
+            document.getElementById('totalDrivers').textContent = ship.totalDrivers || '0';
+            document.getElementById('heavyOpsLead').textContent = ship.heavyOpsLead || '-';
+            document.getElementById('heavyOpsAssistant').textContent = ship.heavyOpsAssistant || '-';
+            document.getElementById('operationManager').textContent = ship.operationManager || '-';
+
+            // Update targets
+            document.getElementById('brvTarget').textContent = ship.brvTarget || '0';
+            document.getElementById('zeeTarget').textContent = ship.zeeTarget || '0';
+            document.getElementById('souTarget').textContent = ship.souTarget || '0';
+            document.getElementById('expectedRate').textContent = ship.expectedRate || '0';
+
+            // Update progress
+            updateProgressDisplay(ship.progress || 0);
+        }
+
+        // Update progress display
+        function updateProgressDisplay(progress) {
+            const progressText = document.getElementById('progressText');
+            const progressValue = document.getElementById('progressValue');
+            const progressCircle = document.getElementById('progressCircle');
+            const progressSlider = document.getElementById('progressSlider');
+
+            progressText.textContent = `${progress}%`;
+            progressValue.textContent = `${progress}%`;
+            progressSlider.value = progress;
+
+            // Update circular progress
+            const circumference = 2 * Math.PI * 52;
+            const strokeDasharray = `${(progress / 100) * circumference} ${circumference}`;
+            progressCircle.style.strokeDasharray = strokeDasharray;
+        }
+
+        // Update progress
+        async function updateProgress() {
+            const newProgress = parseInt(document.getElementById('progressSlider').value);
+            
+            try {
+                const response = await fetch(`/api/ships/${shipId}/progress`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ progress: newProgress })
+                });
+
+                if (response.ok) {
+                    const updatedShip = await response.json();
+                    currentShip = updatedShip;
+                    updateProgressDisplay(newProgress);
+                    
+                    // Update status if it changed
+                    const statusBadge = document.getElementById('statusBadge');
+                    const statusText = document.getElementById('statusText');
+                    statusBadge.className = `px-4 py-2 rounded-full text-white font-semibold status-${updatedShip.status}`;
+                    statusText.textContent = updatedShip.status.charAt(0).toUpperCase() + updatedShip.status.slice(1);
+                    
+                    showNotification('Progress updated successfully!', 'success');
+                } else {
+                    throw new Error('Failed to update progress');
+                }
+            } catch (error) {
+                console.error('Error updating progress:', error);
+                showNotification('Failed to update progress', 'error');
+            }
+        }
+
+        // Update status
+        async function updateStatus(newStatus) {
+            try {
+                const response = await fetch(`/api/ships/${shipId}/status`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ status: newStatus })
+                });
+
+                if (response.ok) {
+                    const updatedShip = await response.json();
+                    currentShip = updatedShip;
+                    
+                    // Update status display
+                    const statusBadge = document.getElementById('statusBadge');
+                    const statusText = document.getElementById('statusText');
+                    statusBadge.className = `px-4 py-2 rounded-full text-white font-semibold status-${newStatus}`;
+                    statusText.textContent = newStatus.charAt(0).toUpperCase() + newStatus.slice(1);
+                    
+                    showNotification(`Status updated to ${newStatus}!`, 'success');
+                } else {
+                    throw new Error('Failed to update status');
+                }
+            } catch (error) {
+                console.error('Error updating status:', error);
+                showNotification('Failed to update status', 'error');
+            }
+        }
+
+        // Navigation functions
+        function goBack() {
+            window.history.back();
+        }
+
+        function goToMaster() {
+            window.location.href = '/master';
+        }
+
+        function editShip() {
+            // TODO: Implement edit functionality
+            showNotification('Edit functionality coming soon!', 'info');
+        }
+
+        // Utility functions
+        function hideLoading() {
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('mainContent').classList.remove('hidden');
+        }
+
+        function showError() {
+            document.getElementById('loadingState').classList.add('hidden');
+            document.getElementById('errorState').classList.remove('hidden');
+        }
+
+        function showNotification(message, type = 'info') {
+            // Create notification element
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg text-white font-semibold transition-all duration-300 transform translate-x-full`;
+            
+            // Set color based on type
+            switch (type) {
+                case 'success':
+                    notification.classList.add('bg-green-600');
+                    break;
+                case 'error':
+                    notification.classList.add('bg-red-600');
+                    break;
+                case 'info':
+                default:
+                    notification.classList.add('bg-blue-600');
+                    break;
+            }
+            
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            // Animate in
+            setTimeout(() => {
+                notification.classList.remove('translate-x-full');
+            }, 100);
+            
+            // Remove after 3 seconds
+            setTimeout(() => {
+                notification.classList.add('translate-x-full');
+                setTimeout(() => {
+                    document.body.removeChild(notification);
+                }, 300);
+            }, 3000);
+        }
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            loadShipDetails();
+        });
+    </script>
+</body>
+</html>
