@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maritime Operations Master Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .ship-card {
+            transition: all 0.3s ease;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .ship-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        .berth-indicator {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        .status-active { background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%); }
+        .status-loading { background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); }
+        .status-discharge { background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%); }
+        .status-complete { background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%); }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-lg border-b-4 border-blue-600">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-6">
+                <div class="flex items-center">
+                    <i class="fas fa-ship text-4xl text-blue-600 mr-4"></i>
+                    <div>
+                        <h1 class="text-3xl font-bold text-gray-900">Maritime Operations Center</h1>
+                        <p class="text-gray-600">Multi-Ship Operations Dashboard</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div class="text-right">
+                        <div class="text-sm text-gray-500">Current Time</div>
+                        <div id="currentTime" class="text-lg font-semibold text-gray-900"></div>
+                    </div>
+                    <div class="flex space-x-4">
+                        <button onclick="goToAnalytics()" class="bg-orange-600 hover:bg-orange-700 text-white px-4 py-2 rounded-lg font-semibold transition duration-200">
+                            <i class="fas fa-chart-line mr-2"></i>Analytics
+                        </button>
+                        <button onclick="goToCalendar()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-semibold transition duration-200">
+                            <i class="fas fa-calendar-alt mr-2"></i>Calendar View
+                        </button>
+                        <button onclick="createNewOperation()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-semibold transition duration-200">
+                            <i class="fas fa-plus mr-2"></i>New Operation
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Overview Stats -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-blue-100">
+                        <i class="fas fa-ship text-2xl text-blue-600"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-500">Active Ships</p>
+                        <p id="activeShipsCount" class="text-2xl font-bold text-gray-900">0</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-green-100">
+                        <i class="fas fa-users text-2xl text-green-600"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-500">Teams Deployed</p>
+                        <p id="teamsCount" class="text-2xl font-bold text-gray-900">0</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-yellow-100">
+                        <i class="fas fa-car text-2xl text-yellow-600"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-500">Total Vehicles</p>
+                        <p id="totalVehicles" class="text-2xl font-bold text-gray-900">0</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-white rounded-xl shadow-lg p-6">
+                <div class="flex items-center">
+                    <div class="p-3 rounded-full bg-purple-100">
+                        <i class="fas fa-anchor text-2xl text-purple-600"></i>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm font-medium text-gray-500">Berths Occupied</p>
+                        <p id="berthsOccupied" class="text-2xl font-bold text-gray-900">0</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Controls and Filters -->
+        <div class="bg-white rounded-xl shadow-lg p-6 mb-8">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
+                <div class="flex items-center space-x-4">
+                    <h2 class="text-xl font-bold text-gray-900">Active Operations</h2>
+                    <select id="filterStatus" class="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500" onchange="filterShips()">
+                        <option value="all">All Status</option>
+                        <option value="active">Active</option>
+                        <option value="loading">Loading</option>
+                        <option value="discharge">Discharge</option>
+                        <option value="complete">Complete</option>
+                    </select>
+                </div>
+                <div class="flex space-x-4">
+                    <button onclick="refreshShips()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition duration-200">
+                        <i class="fas fa-sync-alt mr-2"></i>Refresh
+                    </button>
+                    <button onclick="exportData()" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-semibold transition duration-200">
+                        <i class="fas fa-download mr-2"></i>Export
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ships Grid -->
+        <div id="shipsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+            <!-- Ships will be dynamically loaded here -->
+        </div>
+
+        <!-- Port Layout -->
+        <div class="bg-white rounded-xl shadow-lg p-6">
+            <h2 class="text-2xl font-bold text-gray-900 mb-6">Port Layout - Berth Status</h2>
+            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <!-- Berths will be dynamically loaded here -->
+                <div id="berthsContainer" class="contents">
+                    <!-- Berth indicators will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let ships = [];
+        let berths = {};
+
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            updateCurrentTime();
+            setInterval(updateCurrentTime, 1000);
+            loadShips();
+            loadBerths();
+            
+            // Refresh data every 30 seconds
+            setInterval(() => {
+                loadShips();
+                loadBerths();
+            }, 30000);
+        });
+
+        function updateCurrentTime() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('en-US', {
+                hour12: false,
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            document.getElementById('currentTime').textContent = timeString;
+        }
+
+        async function loadShips() {
+            try {
+                const response = await fetch('/api/ships');
+                ships = await response.json();
+                renderShips();
+                updateStats();
+            } catch (error) {
+                console.error('Error loading ships:', error);
+            }
+        }
+
+        async function loadBerths() {
+            try {
+                const response = await fetch('/api/ships/berths');
+                berths = await response.json();
+                renderBerths();
+            } catch (error) {
+                console.error('Error loading berths:', error);
+            }
+        }
+
+        function renderShips() {
+            const container = document.getElementById('shipsContainer');
+            const filter = document.getElementById('filterStatus').value;
+            
+            let filteredShips = ships;
+            if (filter !== 'all') {
+                filteredShips = ships.filter(ship => ship.status === filter);
+            }
+
+            if (filteredShips.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full text-center py-12">
+                        <i class="fas fa-ship text-6xl text-gray-300 mb-4"></i>
+                        <h3 class="text-xl font-semibold text-gray-500 mb-2">No Ships Found</h3>
+                        <p class="text-gray-400">No ships match the current filter criteria.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const shipsHtml = ships.map(ship => `
+                <div class="ship-card rounded-xl p-6 text-white cursor-pointer ${getStatusClass(ship.status)}" onclick="viewShipDetails(${ship.id})">
+                    <div class="flex justify-between items-start mb-4">
+                        <div>
+                            <h3 class="text-xl font-bold">${ship.vesselName}</h3>
+                            <p class="text-blue-100">${ship.vesselType}</p>
+                        </div>
+                        <div class="text-right">
+                            <div class="bg-white bg-opacity-20 rounded-lg px-3 py-1">
+                                <span class="text-sm font-semibold">${ship.berth}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <div class="flex justify-between text-sm mb-2">
+                            <span>Progress</span>
+                            <span>${ship.progress || 0}%</span>
+                        </div>
+                        <div class="w-full bg-white bg-opacity-20 rounded-full h-2">
+                            <div class="bg-white h-2 rounded-full transition-all duration-300" style="width: ${ship.progress || 0}%"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                            <div class="text-blue-100">Vehicles</div>
+                            <div class="font-semibold">${ship.totalVehicles || 0}</div>
+                        </div>
+                        <div>
+                            <div class="text-blue-100">Status</div>
+                            <div class="font-semibold capitalize">${ship.status}</div>
+                        </div>
+                        <div>
+                            <div class="text-blue-100">Start Time</div>
+                            <div class="font-semibold">${ship.shiftStart || 'N/A'}</div>
+                        </div>
+                        <div>
+                            <div class="text-blue-100">End Time</div>
+                            <div class="font-semibold">${ship.shiftEnd || 'N/A'}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4 pt-4 border-t border-white border-opacity-20">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-blue-100">Operation Manager</span>
+                            <span class="text-sm font-semibold">${ship.operationManager || 'N/A'}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            
+            container.innerHTML = shipsHtml;
+        }
+
+        function renderBerths() {
+            const container = document.getElementById('berthsContainer');
+            const berthsHtml = Object.entries(berths).map(([berthName, berthData]) => {
+                const isOccupied = berthData !== null;
+                const statusClass = isOccupied ? getStatusClass(berthData.status) : 'bg-gray-200';
+                
+                return `
+                    <div class="${statusClass} rounded-lg p-4 text-center cursor-pointer transition-all duration-200 hover:scale-105" 
+                         onclick="${isOccupied ? `viewBerthDetails('${berthName}')` : ''}">
+                        <div class="text-white font-semibold mb-2">${berthName}</div>
+                        ${isOccupied ? `
+                            <div class="text-white text-sm mb-1">${berthData.vesselName}</div>
+                            <div class="text-white text-xs opacity-80">${berthData.status}</div>
+                            <div class="mt-2">
+                                <div class="w-full bg-white bg-opacity-20 rounded-full h-1">
+                                    <div class="bg-white h-1 rounded-full" style="width: ${berthData.progress || 0}%"></div>
+                                </div>
+                            </div>
+                        ` : `
+                            <div class="text-gray-600 text-sm">Available</div>
+                        `}
+                    </div>
+                `;
+            }).join('');
+            
+            container.innerHTML = berthsHtml;
+        }
+
+        function updateStats() {
+            const activeShips = ships.filter(ship => ship.status !== 'complete').length;
+            const totalVehicles = ships.reduce((sum, ship) => sum + (ship.totalVehicles || 0), 0);
+            const teamsDeployed = activeShips * 2; // Assuming 2 teams per ship
+            const berthsOccupiedCount = Object.values(berths).filter(berth => berth !== null).length;
+            
+            document.getElementById('activeShipsCount').textContent = activeShips;
+            document.getElementById('teamsCount').textContent = teamsDeployed;
+            document.getElementById('totalVehicles').textContent = totalVehicles;
+            document.getElementById('berthsOccupied').textContent = berthsOccupiedCount;
+        }
+
+        function getStatusClass(status) {
+            const statusClasses = {
+                'active': 'status-active',
+                'loading': 'status-loading',
+                'discharge': 'status-discharge',
+                'complete': 'status-complete'
+            };
+            return statusClasses[status] || 'bg-gray-500';
+        }
+
+        function createNewOperation() {
+            window.location.href = '/';
+        }
+
+        function goToCalendar() {
+            window.location.href = '/calendar';
+        }
+
+        function goToAnalytics() {
+            window.location.href = '/analytics';
+        }
+
+        function viewShipDetails(shipId) {
+            window.location.href = `/ship-details?id=${shipId}`;
+        }
+
+        function viewBerthDetails(berth) {
+            const ship = ships.find(s => s.berth === berth);
+            if (ship) {
+                viewShipDetails(ship.id);
+            }
+        }
+
+        function filterShips() {
+            const filter = document.getElementById('filterStatus').value;
+            // Implementation for filtering ships
+            renderShips();
+        }
+
+        function refreshShips() {
+            loadShips();
+            loadBerths();
+        }
+
+        function exportData() {
+            // Implementation for exporting data
+            const dataStr = JSON.stringify(ships, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            const url = URL.createObjectURL(dataBlob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `ships-data-${new Date().toISOString().split('T')[0]}.json`;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>
